@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from shared.config import get_settings
+from shared.config import get_settings, warn_insecure_defaults
 from core_api.routers import auth, projects, datasets, images, annotations, label_classes, exports, workflows
 from core_api.services.storage import init_storage
 
@@ -17,6 +17,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_insecure_defaults()
     await init_storage()
     yield
 
@@ -30,10 +31,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:80"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 Instrumentator().instrument(app).expose(app)

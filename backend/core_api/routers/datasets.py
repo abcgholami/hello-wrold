@@ -1,4 +1,5 @@
 """Dataset and dataset version endpoints."""
+import random
 import uuid
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -7,7 +8,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.db import get_db
-from shared.db.models import Dataset, DatasetVersion, DatasetVersionImage, Image, Annotation
+from shared.db.models import Dataset, DatasetVersion, DatasetVersionImage, Image, Annotation, User
+from shared.auth.deps import get_current_user
 
 router = APIRouter()
 
@@ -26,7 +28,7 @@ class DatasetVersionCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_dataset(data: DatasetCreate, db: AsyncSession = Depends(get_db)):
+async def create_dataset(data: DatasetCreate, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user),):
     dataset = Dataset(project_id=data.project_id, name=data.name, description=data.description)
     db.add(dataset)
     await db.commit()
@@ -36,14 +38,14 @@ async def create_dataset(data: DatasetCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.get("")
-async def list_datasets(project_id: str, db: AsyncSession = Depends(get_db)):
+async def list_datasets(project_id: str, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user),):
     result = await db.execute(select(Dataset).where(Dataset.project_id == project_id))
     datasets = result.scalars().all()
     return [{"id": d.id, "name": d.name, "created_at": d.created_at.isoformat()} for d in datasets]
 
 
 @router.get("/{dataset_id}")
-async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)):
+async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user),):
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
     ds = result.scalar_one_or_none()
     if not ds:
@@ -56,7 +58,7 @@ async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{dataset_id}/stats")
-async def dataset_stats(dataset_id: str, db: AsyncSession = Depends(get_db)):
+async def dataset_stats(dataset_id: str, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user),):
     """Return annotation statistics for the dataset statistics dashboard."""
     # Image counts by status
     status_q = await db.execute(
@@ -91,6 +93,7 @@ async def create_version(
     data: DatasetVersionCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
 ):
     """Create an immutable dataset version snapshot with train/val/test split."""
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
@@ -154,7 +157,7 @@ async def create_version(
 
 
 @router.get("/{dataset_id}/versions")
-async def list_versions(dataset_id: str, db: AsyncSession = Depends(get_db)):
+async def list_versions(dataset_id: str, db: AsyncSession = Depends(get_db), _user: User = Depends(get_current_user),):
     result = await db.execute(
         select(DatasetVersion)
         .where(DatasetVersion.dataset_id == dataset_id)

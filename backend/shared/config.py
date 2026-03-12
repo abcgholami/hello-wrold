@@ -1,5 +1,12 @@
-from pydantic_settings import BaseSettings
+import logging
 from functools import lru_cache
+from typing import List
+
+from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
+
+_INSECURE_DEFAULT_SECRET = "super-secret-jwt-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -17,7 +24,7 @@ class Settings(BaseSettings):
     minio_bucket: str = "visionforge-media"
 
     # Auth
-    jwt_secret: str = "super-secret-jwt-key-change-in-production"
+    jwt_secret: str = _INSECURE_DEFAULT_SECRET
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
@@ -33,6 +40,13 @@ class Settings(BaseSettings):
     # Training temp dir
     training_temp_dir: str = "/tmp/visionforge"
 
+    # CORS — comma-separated origins; defaults cover local dev stack
+    allowed_origins: List[str] = [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:80",
+    ]
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -41,3 +55,13 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def warn_insecure_defaults() -> None:
+    """Log a prominent warning if the JWT secret is the shipped default value."""
+    s = get_settings()
+    if s.jwt_secret == _INSECURE_DEFAULT_SECRET:
+        logger.critical(
+            "⚠️  JWT_SECRET is set to the insecure default value. "
+            "Generate a strong secret with: openssl rand -hex 32"
+        )

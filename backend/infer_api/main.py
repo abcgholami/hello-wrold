@@ -10,17 +10,19 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from infer_api.routers import predict, inference_endpoints, inference_ws
 from infer_api.engine_cache import ModelEngineCache
+from shared.config import get_settings, warn_insecure_defaults
 
+settings = get_settings()
 _cache: ModelEngineCache = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_insecure_defaults()
     global _cache
     _cache = ModelEngineCache(max_size=5)
     app.state.engine_cache = _cache
     yield
-    # Cleanup on shutdown
     _cache.clear()
 
 
@@ -33,10 +35,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 Instrumentator().instrument(app).expose(app)

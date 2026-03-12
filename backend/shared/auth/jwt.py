@@ -1,5 +1,6 @@
-"""JWT token creation and validation utilities."""
+"""JWT token creation, validation, and revocation utilities."""
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -9,8 +10,11 @@ from passlib.context import CryptContext
 
 from shared.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+_BLACKLIST_PREFIX = "bl:"
 
 
 def hash_password(password: str) -> str:
@@ -34,8 +38,23 @@ def create_refresh_token(user_id: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Raises JWTError if invalid."""
+    """Raises JWTError if invalid or expired."""
     return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+
+def blacklist_token(token: str, exp: int) -> None:
+    """Store token in Redis with TTL equal to its remaining lifetime.
+
+    Fails silently so a Redis outage does not break the logout endpoint.
+    """
+    ttl = max(1, exp - int(datetime.now(timezone.utc).timestamp()))
+    try:
+        import redis as sync_redis
+        r = sync_redis.from_url(settings.redis_url, decode_responses=True)
+        r.setex(f"{_BLACKLIST_PREFIX}{token}", ttl, "1")
+        r.close()
+    except Exception as exc:
+        logger.warning("Could not blacklist token in Redis: %s", exc)
 
 
 def generate_api_key() -> tuple[str, str, str]:

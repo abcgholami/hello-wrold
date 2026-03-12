@@ -1,12 +1,7 @@
-import logging
 from functools import lru_cache
 from typing import List
 
 from pydantic_settings import BaseSettings
-
-logger = logging.getLogger(__name__)
-
-_INSECURE_DEFAULT_SECRET = "super-secret-jwt-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -22,12 +17,6 @@ class Settings(BaseSettings):
     minio_access_key: str = "visionforge"
     minio_secret_key: str = "visionforge_secret"
     minio_bucket: str = "visionforge-media"
-
-    # Auth
-    jwt_secret: str = _INSECURE_DEFAULT_SECRET
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 7
 
     # MLflow
     mlflow_tracking_uri: str = "http://localhost:5000"
@@ -55,13 +44,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
-
-def warn_insecure_defaults() -> None:
-    """Log a prominent warning if the JWT secret is the shipped default value."""
-    s = get_settings()
-    if s.jwt_secret == _INSECURE_DEFAULT_SECRET:
-        logger.critical(
-            "⚠️  JWT_SECRET is set to the insecure default value. "
-            "Generate a strong secret with: openssl rand -hex 32"
-        )

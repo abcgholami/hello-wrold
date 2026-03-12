@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_assist.routers import sam, clip_assist
-from shared.config import get_settings, warn_insecure_defaults
+from shared.config import get_settings
 
 settings = get_settings()
 _sam_model = None
@@ -17,7 +17,6 @@ _clip_model = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    warn_insecure_defaults()
     # Models are loaded lazily on first request to avoid startup delay
     yield
 

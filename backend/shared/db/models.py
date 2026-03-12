@@ -88,7 +88,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
-    org_id = Column(UUID(as_uuid=False), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=False), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String, nullable=False)
     # classification, detection, instance_seg, semantic_seg
     task_type = Column(String, nullable=False)

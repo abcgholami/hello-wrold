@@ -8,15 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.db import get_db
-from shared.db.models import Annotation, Image, User
-from shared.auth.deps import get_current_user
+from shared.db.models import Annotation, Image
 
 router = APIRouter()
 
 
 class AnnotationCreate(BaseModel):
     label_class_id: str
-    annotation_type: str          # bbox, polygon, mask, classification, keypoints
+    annotation_type: str
     bbox_x: Optional[float] = None
     bbox_y: Optional[float] = None
     bbox_w: Optional[float] = None
@@ -35,7 +34,7 @@ class AnnotationUpdate(BaseModel):
     bbox_h: Optional[float] = None
     segmentation: Optional[Any] = None
     keypoints: Optional[Any] = None
-    review_status: Optional[str] = None  # pending, approved, rejected
+    review_status: Optional[str] = None
 
 
 def _serialize(ann: Annotation) -> dict:
@@ -55,27 +54,17 @@ def _serialize(ann: Annotation) -> dict:
 
 
 @router.get("/images/{image_id}/annotations")
-async def list_annotations(
-    image_id: str,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
+async def list_annotations(image_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Annotation)
         .where(Annotation.image_id == image_id)
         .options(selectinload(Annotation.label_class))
     )
-    annotations = result.scalars().all()
-    return [_serialize(a) for a in annotations]
+    return [_serialize(a) for a in result.scalars().all()]
 
 
 @router.post("/images/{image_id}/annotations", status_code=201)
-async def create_annotation(
-    image_id: str,
-    data: AnnotationCreate,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
+async def create_annotation(image_id: str, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Image).where(Image.id == image_id))
     img = result.scalar_one_or_none()
     if not img:
@@ -85,90 +74,56 @@ async def create_annotation(
         image_id=image_id,
         label_class_id=data.label_class_id,
         annotation_type=data.annotation_type,
-        bbox_x=data.bbox_x,
-        bbox_y=data.bbox_y,
-        bbox_w=data.bbox_w,
-        bbox_h=data.bbox_h,
-        segmentation=data.segmentation,
-        keypoints=data.keypoints,
-        confidence=data.confidence,
-        is_ai_generated=data.is_ai_generated,
+        bbox_x=data.bbox_x, bbox_y=data.bbox_y, bbox_w=data.bbox_w, bbox_h=data.bbox_h,
+        segmentation=data.segmentation, keypoints=data.keypoints,
+        confidence=data.confidence, is_ai_generated=data.is_ai_generated,
     )
     db.add(ann)
-
-    # Update image annotation_status using the already-loaded img object
     if img.annotation_status == "unannotated":
         img.annotation_status = "in_progress"
-
     await db.commit()
     await db.refresh(ann)
     return _serialize(ann)
 
 
 @router.post("/images/{image_id}/annotations/batch", status_code=201)
-async def create_annotations_batch(
-    image_id: str,
-    data: List[AnnotationCreate],
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
-    """Create multiple annotations at once (used after AI-assist bulk predict)."""
+async def create_annotations_batch(image_id: str, data: List[AnnotationCreate], db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Image).where(Image.id == image_id))
     img = result.scalar_one_or_none()
     if not img:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    created = []
-    for item in data:
-        ann = Annotation(
-            image_id=image_id,
-            label_class_id=item.label_class_id,
-            annotation_type=item.annotation_type,
-            bbox_x=item.bbox_x,
-            bbox_y=item.bbox_y,
-            bbox_w=item.bbox_w,
-            bbox_h=item.bbox_h,
-            segmentation=item.segmentation,
-            keypoints=item.keypoints,
-            confidence=item.confidence,
-            is_ai_generated=item.is_ai_generated,
+    created = [
+        Annotation(
+            image_id=image_id, label_class_id=item.label_class_id, annotation_type=item.annotation_type,
+            bbox_x=item.bbox_x, bbox_y=item.bbox_y, bbox_w=item.bbox_w, bbox_h=item.bbox_h,
+            segmentation=item.segmentation, keypoints=item.keypoints,
+            confidence=item.confidence, is_ai_generated=item.is_ai_generated,
         )
-        db.add(ann)
-        created.append(ann)
-
+        for item in data
+    ]
+    db.add_all(created)
     if data:
         img.annotation_status = "in_progress"
-
     await db.commit()
     return {"created": len(created)}
 
 
 @router.put("/{annotation_id}")
-async def update_annotation(
-    annotation_id: str,
-    data: AnnotationUpdate,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
+async def update_annotation(annotation_id: str, data: AnnotationUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Annotation).where(Annotation.id == annotation_id))
     ann = result.scalar_one_or_none()
     if not ann:
         raise HTTPException(status_code=404, detail="Annotation not found")
-
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(ann, field, value)
-
     await db.commit()
     await db.refresh(ann)
     return _serialize(ann)
 
 
 @router.delete("/{annotation_id}", status_code=204)
-async def delete_annotation(
-    annotation_id: str,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
+async def delete_annotation(annotation_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Annotation).where(Annotation.id == annotation_id))
     ann = result.scalar_one_or_none()
     if not ann:
@@ -178,12 +133,7 @@ async def delete_annotation(
 
 
 @router.post("/images/{image_id}/mark-annotated")
-async def mark_annotated(
-    image_id: str,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
-    """Mark image as fully annotated (moves to review queue)."""
+async def mark_annotated(image_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Image).where(Image.id == image_id))
     img = result.scalar_one_or_none()
     if not img:

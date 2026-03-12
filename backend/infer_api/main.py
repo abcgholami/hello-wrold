@@ -10,7 +10,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from infer_api.routers import predict, inference_endpoints, inference_ws
 from infer_api.engine_cache import ModelEngineCache
-from shared.config import get_settings, warn_insecure_defaults
+from shared.config import get_settings
 
 settings = get_settings()
 _cache: ModelEngineCache = None
@@ -18,7 +18,6 @@ _cache: ModelEngineCache = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    warn_insecure_defaults()
     global _cache
     _cache = ModelEngineCache(max_size=5)
     app.state.engine_cache = _cache

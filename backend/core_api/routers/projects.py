@@ -7,15 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.db import get_db
-from shared.db.models import Project, User
-from shared.auth.deps import get_current_user, get_current_org_id
+from shared.db.models import Project
 
 router = APIRouter()
+
+VALID_TASK_TYPES = ("classification", "detection", "instance_seg", "semantic_seg")
 
 
 class ProjectCreate(BaseModel):
     name: str
-    task_type: str   # classification, detection, instance_seg, semantic_seg
+    task_type: str
     description: Optional[str] = None
 
 
@@ -24,93 +25,39 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
 
 
-class ProjectResponse(BaseModel):
-    id: str
-    name: str
-    task_type: str
-    description: Optional[str]
-    org_id: str
-    created_at: str
-
-    model_config = {"from_attributes": True}
-
-
-@router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-async def create_project(
-    data: ProjectCreate,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-    org_id: str | None = Depends(get_current_org_id),
-):
-    if not org_id:
-        raise HTTPException(status_code=400, detail="User has no organisation")
-    if data.task_type not in ("classification", "detection", "instance_seg", "semantic_seg"):
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db)):
+    if data.task_type not in VALID_TASK_TYPES:
         raise HTTPException(status_code=400, detail="Invalid task_type")
-    project = Project(
-        org_id=org_id,
-        name=data.name,
-        task_type=data.task_type,
-        description=data.description,
-    )
+    project = Project(name=data.name, task_type=data.task_type, description=data.description)
     db.add(project)
     await db.commit()
     await db.refresh(project)
-    return ProjectResponse(
-        id=project.id,
-        name=project.name,
-        task_type=project.task_type,
-        description=project.description,
-        org_id=project.org_id,
-        created_at=project.created_at.isoformat(),
-    )
+    return {"id": project.id, "name": project.name, "task_type": project.task_type,
+            "description": project.description, "created_at": project.created_at.isoformat()}
 
 
 @router.get("")
-async def list_projects(
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-    org_id: str | None = Depends(get_current_org_id),
-):
-    if not org_id:
-        return []
-    result = await db.execute(select(Project).where(Project.org_id == org_id))
+async def list_projects(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project))
     projects = result.scalars().all()
-    return [
-        {"id": p.id, "name": p.name, "task_type": p.task_type, "description": p.description,
-         "created_at": p.created_at.isoformat()}
-        for p in projects
-    ]
+    return [{"id": p.id, "name": p.name, "task_type": p.task_type, "description": p.description,
+             "created_at": p.created_at.isoformat()} for p in projects]
 
 
 @router.get("/{project_id}")
-async def get_project(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-    org_id: str | None = Depends(get_current_org_id),
-):
-    result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.org_id == org_id)
-    )
+async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"id": project.id, "name": project.name, "task_type": project.task_type,
-            "description": project.description, "org_id": project.org_id,
-            "created_at": project.created_at.isoformat()}
+            "description": project.description, "created_at": project.created_at.isoformat()}
 
 
 @router.put("/{project_id}")
-async def update_project(
-    project_id: str,
-    data: ProjectUpdate,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-    org_id: str | None = Depends(get_current_org_id),
-):
-    result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.org_id == org_id)
-    )
+async def update_project(project_id: str, data: ProjectUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -121,15 +68,8 @@ async def update_project(
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_project(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-    org_id: str | None = Depends(get_current_org_id),
-):
-    result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.org_id == org_id)
-    )
+async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

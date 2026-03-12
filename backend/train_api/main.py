@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from shared.config import get_settings, warn_insecure_defaults
+from shared.config import get_settings
 from train_api.routers import training_jobs, model_versions, training_ws
 
 settings = get_settings()
@@ -16,7 +16,6 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    warn_insecure_defaults()
     yield
 
 

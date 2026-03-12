@@ -27,6 +27,53 @@ PostgreSQL · Redis · MinIO · MLflow
 
 ---
 
+## Windows One-Click Installer
+
+The easiest way to get started on Windows is the pre-built `.exe` installer.
+
+### Download
+
+Grab the latest `VisionForge-Setup-x.x.x.exe` from the [GitHub Releases](../../releases/latest) page.
+
+### What the installer does
+
+1. Detects whether **Docker Desktop** is installed — downloads and installs it automatically if not
+2. Enables **WSL 2** and the Virtual Machine Platform Windows features
+3. Asks whether you want **NVIDIA GPU support** (requires an NVIDIA driver ≥ 527.41)
+4. Extracts all platform files to `C:\Program Files\VisionForge` (configurable)
+5. Generates a random **JWT secret** and writes your `.env` file
+6. Pulls Docker images and runs `docker compose up -d`
+7. Runs database migrations automatically
+8. Creates **Desktop** and **Start Menu** shortcuts
+
+After setup, double-click the **VisionForge** desktop shortcut (or use the Start Menu) to launch at any time.
+
+### System requirements (Windows)
+
+| Requirement | Minimum |
+|---|---|
+| OS | Windows 10 21H2 (64-bit) or Windows 11 |
+| RAM | 8 GB (16 GB recommended) |
+| Disk | 20 GB free (Docker images + model cache) |
+| Docker Desktop | 4.0+ (installed automatically if missing) |
+| NVIDIA driver | ≥ 527.41 (optional, GPU training only) |
+
+### Build the installer yourself
+
+```powershell
+# Prerequisites: NSIS 3.x (https://nsis.sourceforge.io/Download)
+# Run on Windows:
+cd installer\windows
+.\build.ps1 -Version 1.0.0
+
+# With code-signing:
+.\build.ps1 -Version 1.0.0 -Sign -CertThumbprint "AABBCCDDEEFF..."
+```
+
+The CI pipeline (`.github/workflows/build-windows-installer.yml`) builds and publishes the `.exe` automatically when a version tag (`v*.*.*`) is pushed.
+
+---
+
 ## Requirements
 
 | Requirement | Details |

@@ -1,0 +1,39 @@
+# GPU-enabled training worker
+FROM nvcr.io/nvidia/pytorch:24.03-py3
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies (PyTorch already in base image)
+RUN pip install --no-cache-dir \
+    fastapi[all] \
+    uvicorn[standard] \
+    sqlalchemy[asyncio] \
+    asyncpg \
+    pydantic-settings \
+    python-jose[cryptography] \
+    passlib[bcrypt] \
+    minio \
+    celery[redis] \
+    redis \
+    mlflow \
+    pyyaml \
+    albumentations \
+    Pillow \
+    opencv-python-headless \
+    ultralytics \
+    "supervision>=0.20"
+
+COPY . .
+
+# Celery GPU worker command (set in docker-compose)
+CMD ["celery", "-A", "train_api.workers.celery_app", "worker", "--loglevel=info", "-Q", "gpu_training", "-c", "1"]

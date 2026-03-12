@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "core_api"
+    static_configs:
+      - targets: ["core_api:8000"]
+    metrics_path: /metrics
+
+  - job_name: "train_api"
+    static_configs:
+      - targets: ["train_api:8001"]
+    metrics_path: /metrics
+
+  - job_name: "infer_api"
+    static_configs:
+      - targets: ["infer_api:8002"]
+    metrics_path: /metrics
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

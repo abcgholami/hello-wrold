@@ -1,0 +1,19 @@
+{
+  "name": "@visionforge/sdk",
+  "version": "1.0.0",
+  "description": "VisionForge Machine Vision Platform JavaScript SDK",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}
